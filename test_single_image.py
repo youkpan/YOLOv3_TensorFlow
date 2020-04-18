@@ -6,14 +6,14 @@ import tensorflow as tf
 import numpy as np
 import argparse
 import cv2
-
+import matplotlib.pyplot as plt
 from utils.misc_utils import parse_anchors, read_class_names
 from utils.nms_utils import gpu_nms
 from utils.plot_utils import get_color_table, plot_one_box
 from utils.data_aug import letterbox_resize
 
 from model import yolov3
-
+import datetime
 parser = argparse.ArgumentParser(description="YOLO-V3 test single image test procedure.")
 parser.add_argument("input_image", type=str,
                     help="The path of the input image.")
@@ -48,6 +48,7 @@ img = img[np.newaxis, :] / 255.
 with tf.Session() as sess:
     input_data = tf.placeholder(tf.float32, [1, args.new_size[1], args.new_size[0], 3], name='input_data')
     yolo_model = yolov3(args.num_class, args.anchors)
+
     with tf.variable_scope('yolov3'):
         pred_feature_maps = yolo_model.forward(input_data, False)
     pred_boxes, pred_confs, pred_probs = yolo_model.predict(pred_feature_maps)
@@ -58,7 +59,7 @@ with tf.Session() as sess:
 
     saver = tf.train.Saver()
     saver.restore(sess, args.restore_path)
-
+    begin = datetime.datetime.now()
     boxes_, scores_, labels_ = sess.run([boxes, scores, labels], feed_dict={input_data: img})
 
     # rescale the coordinates to the original image
@@ -68,7 +69,7 @@ with tf.Session() as sess:
     else:
         boxes_[:, [0, 2]] *= (width_ori/float(args.new_size[0]))
         boxes_[:, [1, 3]] *= (height_ori/float(args.new_size[1]))
-
+    end = datetime.datetime.now()
     print("box coords:")
     print(boxes_)
     print('*' * 30)
@@ -77,10 +78,13 @@ with tf.Session() as sess:
     print('*' * 30)
     print("labels:")
     print(labels_)
+    print("time:",(end - begin).total_seconds())
 
     for i in range(len(boxes_)):
         x0, y0, x1, y1 = boxes_[i]
         plot_one_box(img_ori, [x0, y0, x1, y1], label=args.classes[labels_[i]] + ', {:.2f}%'.format(scores_[i] * 100), color=color_table[labels_[i]])
     cv2.imshow('Detection result', img_ori)
     cv2.imwrite('detection_result.jpg', img_ori)
-    cv2.waitKey(0)
+    #cv2.waitKey(0)
+    plt.imshow(img)
+    plt.show()
